@@ -1,0 +1,8 @@
+
+hunchentoot-auth
+
+This package is for implementing user authentication with passwords
+for the hunchentoot Common Lisp web server.
+
+
+
