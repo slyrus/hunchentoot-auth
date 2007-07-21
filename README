@@ -4,5 +4,7 @@ hunchentoot-auth
 This package is for implementing user authentication with passwords
 for the hunchentoot Common Lisp web server.
 
-
+The core unit of hunchentoot-auth is the realm. Currently a realm is
+just a "bag" for holding users and their associated (hashed)
+passwords.
 

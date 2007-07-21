@@ -3,9 +3,6 @@
 ;;; Copyright (c) 2007 Cyrus Harmon (ch-lisp@bobobeach.com)
 ;;; All rights reserved.
 ;;;
-;;; This file contains code that is a derivative of work that is:
-;;; Copyright (c) 2004-2007, Dr. Edmund Weitz.  All rights reserved.
-;;;
 ;;; Redistribution and use in source and binary forms, with or without
 ;;; modification, are permitted provided that the following conditions
 ;;; are met:
@@ -33,63 +30,19 @@
 
 (in-package #:hunchentoot-auth)
 
-(defparameter *password-file-lock* (make-lock "password-file-lock"))
-(defparameter *password-lock* (make-lock "password-lock"))
-
-;;;
-;;; defclass realm
-;;;
-(defclass realm ()
-  ((passwords :accessor realm-passwords
-              :initform (make-hash-table :test 'equal)
-              :documentation "A hash-table for the users and passwords
-for this realm. The keys are the user names and the values the md5
-hashed password for the user.")
-   (password-storage-path :initarg :password-storage-path
-                          :accessor realm-password-storage-path
-                          :initform nil
-                          :documentation "The path to the file to
-store the password hash-table in."))
-  (:documentation "Objects of this class represent realms for which a
-  given user/password scheme should apply."))
-
-(defun read-realm-passwords (realm &key (path (realm-password-storage-path realm)))
-  (when (probe-file path)
-    (with-lock (*password-file-lock*)
-      (setf (realm-passwords realm)
-            (cl-store:restore path)))))
-
-(defun store-realm-passwords (realm &key (path (realm-password-storage-path realm)))
-  (ensure-directories-exist path)
-  (with-lock (*password-file-lock*)
-    (cl-store:store (realm-passwords realm) path)))
-
-(defmethod get-password-hash ((realm realm) user)
-  (with-lock (*password-lock*)
-    (gethash user (realm-passwords realm))))
-
-(defmethod set-password ((realm realm) user password)
-  (with-lock (*password-lock*)
-    (setf (gethash user (realm-passwords realm))
-          (md5:md5sum-sequence (coerce password 'simple-string)))
-    (store-realm-passwords realm)))
-
-(defmethod add-user ((realm realm) user password)
-  (set-password realm user password))
-
-(defmethod check-password ((realm realm) user password)
-  (and password
-       (equalp (get-password-hash realm user)
-               (md5:md5sum-sequence (coerce password 'simple-string)))))
+(defmacro with-html-page (&body body)
+  "Executes BODY inside a cl-who:with-html-output-to-string body,
+directing the output to *standard-output* and setting :prologue to t."
+  `(with-html-output-to-string (*standard-output* nil :prologue t)
+     ,@body))
 
 (defmacro with-html (&body body)
   "Executes BODY inside a cl-who:with-html-output body."
   `(with-html-output (*standard-output*)
      ,@body))
 
-(defun generate-html-login (user password)
+(defun generate-html-login (&key user password)
   (with-html
-    "Please login:"
     (:form :method :post
            "Name: "
            (if user
@@ -102,3 +55,49 @@ store the password hash-table in."))
                (htm (:input :type :password :name "password")))
            (:br)
            (:input :type :submit :value "Submit"))))
+
+(defun login-page (&key
+                   (title "Login"))
+  (with-html-page
+    (:html
+     (:head (:title (str title)))
+     (:body
+      (generate-html-login)))))
+
+(defun parse-host-name-and-port (host-and-port)
+  (let ((strings
+         (nth-value 1
+                    (cl-ppcre:scan-to-strings "^([^:]*)(:([^:]*))?$"
+                                              host-and-port))))
+    (values (elt strings 0)
+            (elt strings 2))))
+
+(defun session-user-authenticated-p ()
+  (session-value 'user-authenticated-p))
+
+(defun (setf session-user-authenticated-p) (value)
+  (setf (session-value 'user-authenticated-p) value))
+
+(defmacro authorized-page ((realm
+                            user
+                            password
+                            &key
+                            (login-page-function #'login-page)) &rest body)
+  `(if (ssl-p)
+       (if (or (and ,user ,password
+                    (check-password ,realm ,user ,password))
+               (session-user-authenticated-p))
+           (progn
+             (unless (session-user-authenticated-p)
+               (setf (session-value 'user) ,user)
+               (setf (session-user-authenticated-p) t))
+             ,@body)
+           (funcall ,login-page-function))
+       (progn
+         (apply #'redirect (request-uri)
+                :protocol :https
+                (let ((port (realm-ssl-port ,realm)))
+                  (when port
+                    (multiple-value-bind (host-name)
+                        (parse-host-name-and-port (host))
+                      `(:host ,host-name :port ,port))))))))
