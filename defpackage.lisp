@@ -41,5 +41,8 @@
            #:add-user
            #:check-password
 
-           #:generate-html-login))
+           #:generate-html-login
+
+           #:authorized-page
+           #:session-user-authenticated-p))
 
