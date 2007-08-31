@@ -83,7 +83,8 @@ directing the output to *standard-output* and setting :prologue to t."
                             password
                             &key
                             (login-page-function #'login-page)) &rest body)
-  `(if (ssl-p)
+  `(if (or (not (realm-use-ssl ,realm))
+           (ssl-p))
        (if (or (and ,user ,password
                     (check-password ,realm ,user ,password))
                (session-user-authenticated-p))
@@ -96,8 +97,9 @@ directing the output to *standard-output* and setting :prologue to t."
        (progn
          (apply #'redirect (request-uri)
                 :protocol :https
-                (let ((port (realm-ssl-port ,realm)))
-                  (when port
+                (let ((ssl-port (realm-ssl-port ,realm)))
+                  (when ssl-port
                     (multiple-value-bind (host-name)
                         (parse-host-name-and-port (host))
-                      `(:host ,host-name :port ,port))))))))
+                      `(:host ,host-name :port ,ssl-port))))))))
+

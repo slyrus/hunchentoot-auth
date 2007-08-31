@@ -32,15 +32,17 @@
 
 (defpackage #:hunchentoot-auth
   (:use #:cl #:cl-who #:hunchentoot #:hunchentoot-mp)
+  (:nicknames #:ht-auth)
   (:export #:realm
 
-           #:read-realm-passwords
-           #:store-realm-passwords
-           #:get-password-hash
+           #:read-realm-users
            #:set-password
            #:add-user
            #:check-password
 
+           #:read-realm-groups
+           #:add-group
+           
            #:generate-html-login
 
            #:authorized-page

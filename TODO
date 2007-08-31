@@ -1,2 +1,5 @@
 
 * Groups - add functionality for group membership
+
+* Conditions - add various conditions for when things go wrong
+  (e.g. adding a duplicate user)

@@ -30,19 +30,42 @@
 
 (in-package #:hunchentoot-auth)
 
-;;;
+
+(defclass user ()
+  ((name :accessor user-name :initarg :name)
+   (password :accessor user-password :initarg :password)))
+
+(defclass group ()
+  ((name :accessor group-name :initarg :name)
+   (users :accessor group-users :initform (make-hash-table))))
+
 ;;; Realm class definition
 (defclass realm ()
-  ((passwords :accessor realm-passwords
-              :initform (make-hash-table :test 'equal)
+  ((users :accessor realm-users
+              :initform (make-hash-table :test #'equal)
               :documentation "A hash-table for the users and passwords
-for this realm. The keys are the user names and the values the md5
-hashed password for the user.")
-   (password-storage-path :initarg :password-storage-path
-                          :accessor realm-password-storage-path
+for this realm. The keys are the user names (strings) and the values are
+instances of the class user.")
+   (user-storage-path :initarg :user-storage-path
+                          :accessor realm-user-storage-path
                           :initform nil
-                          :documentation "The path to the file to
-store the password hash-table in.")
+                          :documentation "The path to the file in
+which to store the password hash-table.")
+   (groups :accessor realm-groups
+           :initform (make-hash-table :test #'equal)
+           :documentation "A hash-table for the groups for this
+realm. The keys are the group names (strings) and the values instances
+of the class group")
+   (group-storage-path :initarg :group-storage-path
+                       :accessor realm-group-storage-path
+                       :initform nil
+                       :documentation "The path to the file in
+which to store the group hash-table.")
+   (use-ssl :initarg :use-ssl
+             :accessor realm-use-ssl
+             :initform t
+             :documentation "When true, redirect authorized requests
+to a URL with https scheme.")
    (ssl-port :initarg :ssl-port
              :accessor realm-ssl-port
              :initform nil
@@ -52,17 +75,14 @@ will use 443."))
   (:documentation "Objects of this class represent realms for which a
   given user/password scheme should apply."))
 
-(defgeneric read-realm-passwords (realm)
-  (:documentation "Read the passwords for this realm from the password
+;;; users and passwords
+(defgeneric read-realm-users (realm)
+  (:documentation "Read the users for this realm from the password
   file."))
 
-(defgeneric store-realm-passwords (realm)
-  (:documentation "Store the passwords for this realm in the password
+(defgeneric store-realm-users (realm)
+  (:documentation "Store the users for this realm in the password
   file."))
-
-(defgeneric get-password-hash (realm user)
-  (:documentation "Get the hashsed password for the specified user in
-  this realm."))
 
 (defgeneric set-password (realm user password)
   (:documentation "Sets the password for the specified user in this
@@ -76,37 +96,86 @@ will use 443."))
   (:documentation "Returns T if the given user/password combination is
   valid in this realm, otherwise returns NIL."))
 
+;;; groups
+(defgeneric read-realm-groups (realm)
+  (:documentation "Read the groups for this realm from the group
+  file."))
+
+(defgeneric store-realm-groups (realm)
+  (:documentation "Store the groups for this realm in the group
+  file."))
+
+(defgeneric add-group (realm group)
+  (:documentation "Adds a new group named group with the specified 
+  realm."))
+
 (defparameter *password-file-lock* (make-lock "password-file-lock"))
 (defparameter *password-lock* (make-lock "password-lock"))
 
-(defmethod read-realm-passwords ((realm realm))
-  (let ((path (realm-password-storage-path realm)))
+(defmethod read-realm-users ((realm realm))
+  (let ((path (realm-user-storage-path realm)))
     (when (probe-file path)
       (with-lock (*password-file-lock*)
-        (setf (realm-passwords realm)
+        (setf (realm-users realm)
               (cl-store:restore path))))))
 
-(defmethod store-realm-passwords ((realm realm))
-  (let ((path (realm-password-storage-path realm)))
+(defmethod store-realm-users ((realm realm))
+  (let ((path (realm-user-storage-path realm)))
     (ensure-directories-exist path)
     (with-lock (*password-file-lock*)
-      (cl-store:store (realm-passwords realm) path))))
+      (cl-store:store (realm-users realm) path))))
 
-(defmethod get-password-hash ((realm realm) user)
+(defmethod set-password ((realm realm) (user user) password)
   (with-lock (*password-lock*)
-    (gethash user (realm-passwords realm))))
-
-(defmethod set-password ((realm realm) user password)
-  (with-lock (*password-lock*)
-    (setf (gethash user (realm-passwords realm))
+    (setf (user-password user)
           (md5:md5sum-sequence (coerce password 'simple-string)))
-    (store-realm-passwords realm)))
+    (store-realm-users realm)))
 
-(defmethod add-user ((realm realm) user password)
-  (set-password realm user password))
+(defun get-realm-user (realm name)
+  (gethash name (realm-users realm)))
 
-(defmethod check-password ((realm realm) user password)
+(defmethod set-password ((realm realm) (name string) password)
+  (let ((user (get-realm-user realm name)))
+    (when user
+      (set-password realm user password))))
+
+(defmethod add-user ((realm realm) (name string) (password string))
+  (let ((user (make-instance 'user :name name)))
+    (with-lock (*password-lock*)
+      (setf (gethash name (realm-users realm)) user)
+      (set-password realm user password))
+    user))
+
+(defmethod check-password ((realm realm) (user user) password)
   (and password
-       (equalp (get-password-hash realm user)
+       (equalp (user-password user)
                (md5:md5sum-sequence (coerce password 'simple-string)))))
+
+(defmethod check-password ((realm realm) (name string) password)
+  (let ((user (get-realm-user realm name)))
+    (when user
+      (check-password realm user password))))
+
+;;; groups
+(defmethod read-realm-groups ((realm realm))
+  (let ((path (realm-group-storage-path realm)))
+    (when (probe-file path)
+      (with-lock (*password-file-lock*)
+        (setf (realm-groups realm)
+              (cl-store:restore path))))))
+
+(defmethod store-realm-groups ((realm realm))
+  (let ((path (realm-group-storage-path realm)))
+    (ensure-directories-exist path)
+    (with-lock (*password-file-lock*)
+      (cl-store:store (realm-groups realm) path))))
+
+(defmethod add-group ((realm realm) (name string))
+  (let ((group (make-instance 'group :name name)))
+    (setf (gethash name (realm-groups realm)) group)
+    (store-realm-groups realm)
+    group))
+
+(defmethod add-group-user ((realm realm) (group group) (user user))
+  )
 
