@@ -46,5 +46,6 @@
            #:generate-html-login
 
            #:authorized-page
+           #:session-user
            #:session-user-authenticated-p))
 

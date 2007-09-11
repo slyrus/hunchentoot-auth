@@ -72,6 +72,12 @@ directing the output to *standard-output* and setting :prologue to t."
     (values (elt strings 0)
             (elt strings 2))))
 
+(defun session-user ()
+  (session-value 'user))
+
+(defun (setf session-user) (value)
+  (setf (session-value 'user) value))
+
 (defun session-user-authenticated-p ()
   (session-value 'user-authenticated-p))
 
