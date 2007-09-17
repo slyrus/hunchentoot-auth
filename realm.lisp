@@ -30,10 +30,10 @@
 
 (in-package #:hunchentoot-auth)
 
-
 (defclass user ()
   ((name :accessor user-name :initarg :name)
-   (password :accessor user-password :initarg :password)))
+   (password :accessor user-password :initarg :password :initform "")
+   (password-salt :accessor user-password-salt :initarg :password-salt)))
 
 (defclass group ()
   ((name :accessor group-name :initarg :name)
@@ -92,6 +92,9 @@ will use 443."))
   (:documentation "Adds a new user with the specified password in this
   realm."))
 
+(defgeneric delete-user (realm user)
+  (:documentation "Removes the user with the specified name from this realm."))
+
 (defgeneric check-password (realm user password)
   (:documentation "Returns T if the given user/password combination is
   valid in this realm, otherwise returns NIL."))
@@ -128,8 +131,22 @@ will use 443."))
 (defmethod set-password ((realm realm) (user user) password)
   (with-lock (*password-lock*)
     (setf (user-password user)
-          (md5:md5sum-sequence (coerce password 'simple-string)))
+          (md5:md5sum-sequence
+           (concatenate 'simple-string (user-password-salt user) password)))
     (store-realm-users realm)))
+
+(defun random-string (length)
+  "Return a random string of the characters [a-zA-Z] of the specified
+length."
+  (coerce
+   (loop for i below length
+      collect
+      (code-char
+       (+ (if (zerop (random 2))
+              (char-code #\a)
+              (char-code #\A))
+          (random 26))))
+   'simple-string))
 
 (defun get-realm-user (realm name)
   (gethash name (realm-users realm)))
@@ -140,16 +157,22 @@ will use 443."))
       (set-password realm user password))))
 
 (defmethod add-user ((realm realm) (name string) (password string))
-  (let ((user (make-instance 'user :name name)))
+  (let ((user (make-instance 'user :name name :password-salt (random-string 8))))
     (with-lock (*password-lock*)
       (setf (gethash name (realm-users realm)) user)
       (set-password realm user password))
     user))
 
+(defmethod delete-user ((realm realm) (name string))
+  (with-lock (*password-lock*)
+    (remhash name (realm-users realm))
+    (store-realm-users realm)))
+
 (defmethod check-password ((realm realm) (user user) password)
   (and password
        (equalp (user-password user)
-               (md5:md5sum-sequence (coerce password 'simple-string)))))
+               (md5:md5sum-sequence
+                (concatenate 'simple-string (user-password-salt user) password)))))
 
 (defmethod check-password ((realm realm) (name string) password)
   (let ((user (get-realm-user realm name)))
