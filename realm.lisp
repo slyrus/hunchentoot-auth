@@ -200,5 +200,5 @@ length."
     group))
 
 (defmethod add-group-user ((realm realm) (group group) (user user))
-  )
+  (error "Not yet implemented"))
 

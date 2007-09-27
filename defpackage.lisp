@@ -46,6 +46,6 @@
            #:generate-html-login
 
            #:authorized-page
-           #:session-user
-           #:session-user-authenticated-p))
+           #:session-realm-user
+           #:session-realm-user-authenticated-p))
 

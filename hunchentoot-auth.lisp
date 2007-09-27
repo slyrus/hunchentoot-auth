@@ -72,17 +72,31 @@ directing the output to *standard-output* and setting :prologue to t."
     (values (elt strings 0)
             (elt strings 2))))
 
-(defun session-user ()
-  (session-value 'user))
+(defun session-realm-user (realm)
+  (let ((hash (session-value 'realm-user-hash)))
+    (when hash
+      (gethash realm hash))))
 
-(defun (setf session-user) (value)
-  (setf (session-value 'user) value))
+(defun (setf session-realm-user) (value realm)
+  (let ((hash (session-value 'realm-user-hash)))
+    (unless hash
+      (setf hash
+            (setf (session-value 'realm-user-hash)
+                  (make-hash-table))))
+    (setf (gethash realm hash) value) *debug-io*))
 
-(defun session-user-authenticated-p ()
-  (session-value 'user-authenticated-p))
+(defun session-realm-user-authenticated-p (realm)
+  (let ((hash (session-value 'realm-user-authenticated-hash)))
+    (when hash
+      (gethash realm hash))))
 
-(defun (setf session-user-authenticated-p) (value)
-  (setf (session-value 'user-authenticated-p) value))
+(defun (setf session-realm-user-authenticated-p) (value realm)
+  (let ((hash (session-value 'realm-user-auhtenticated-hash)))
+    (unless hash
+      (setf hash
+            (setf (session-value 'realm-user-authenticated-hash)
+                  (make-hash-table))))
+    (setf (gethash realm hash) value)))
 
 (defmacro authorized-page ((realm
                             user
@@ -93,11 +107,11 @@ directing the output to *standard-output* and setting :prologue to t."
            (ssl-p))
        (if (or (and ,user ,password
                     (check-password ,realm ,user ,password))
-               (session-user-authenticated-p))
+               (session-realm-user-authenticated-p ,realm))
            (progn
-             (unless (session-user-authenticated-p)
-               (setf (session-value 'user) ,user)
-               (setf (session-user-authenticated-p) t))
+             (unless (session-realm-user-authenticated-p ,realm)
+               (setf (session-realm-user ,realm) ,user)
+               (setf (session-realm-user-authenticated-p ,realm) t))
              ,@body)
            (funcall ,login-page-function))
        (progn

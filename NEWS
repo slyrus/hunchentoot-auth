@@ -1,0 +1,9 @@
+
+* changes to hunchentoot-auth 0.1
+
+* session-user and session-user-authenticated-p have been replaced
+  with session-realm-user and session-realm-user-authenticated-p now
+  take arguments for the realm. This means that a user can be "logged
+  in" in one hunchentoot session for one realm, but not logged in for
+  another realm in the same server/session, or that a user could be
+  logged into each realm with different user names.
