@@ -60,18 +60,7 @@ of the class group")
                        :accessor realm-group-storage-path
                        :initform nil
                        :documentation "The path to the file in
-which to store the group hash-table.")
-   (use-ssl :initarg :use-ssl
-             :accessor realm-use-ssl
-             :initform t
-             :documentation "When true, redirect authorized requests
-to a URL with https scheme.")
-   (ssl-port :initarg :ssl-port
-             :accessor realm-ssl-port
-             :initform nil
-             :documentation "The port on which to use https links. If
-nil then no port is explicitly specified and, presumably, the browser
-will use 443."))
+which to store the group hash-table."))
   (:documentation "Objects of this class represent realms for which a
   given user/password scheme should apply."))
 

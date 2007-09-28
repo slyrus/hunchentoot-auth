@@ -83,7 +83,7 @@ directing the output to *standard-output* and setting :prologue to t."
       (setf hash
             (setf (session-value 'realm-user-hash)
                   (make-hash-table))))
-    (setf (gethash realm hash) value) *debug-io*))
+    (setf (gethash realm hash) value)))
 
 (defun session-realm-user-authenticated-p (realm)
   (let ((hash (session-value 'realm-user-authenticated-hash)))
@@ -91,35 +91,94 @@ directing the output to *standard-output* and setting :prologue to t."
       (gethash realm hash))))
 
 (defun (setf session-realm-user-authenticated-p) (value realm)
-  (let ((hash (session-value 'realm-user-auhtenticated-hash)))
+  (let ((hash (session-value 'realm-user-authenticated-hash)))
     (unless hash
       (setf hash
             (setf (session-value 'realm-user-authenticated-hash)
                   (make-hash-table))))
     (setf (gethash realm hash) value)))
 
+(defmacro with-unique-names ((&rest bindings) &body body)
+  "Syntax: WITH-UNIQUE-NAMES ( { var | (var x) }* ) declaration* form*
+
+Executes a series of forms with each VAR bound to a fresh,
+uninterned symbol. The uninterned symbol is as if returned by a call
+to GENSYM with the string denoted by X - or, if X is not supplied, the
+string denoted by VAR - as argument.
+
+The variable bindings created are lexical unless special declarations
+are specified. The scopes of the name bindings and declarations do not
+include the Xs.
+
+The forms are evaluated in order, and the values of all but the last
+are discarded \(that is, the body is an implicit PROGN)."
+  ;; reference implementation posted to comp.lang.lisp as
+  ;; <cy3bshuf30f.fsf@ljosa.com> by Vebjorn Ljosa - see also
+  ;; <http://www.cliki.net/Common%20Lisp%20Utilities>
+  `(let ,(mapcar #'(lambda (binding)
+                     (check-type binding (or cons symbol))
+                     (if (consp binding)
+                       (destructuring-bind (var x) binding
+                         (check-type var symbol)
+                         `(,var (gensym ,(etypecase x
+                                          (symbol (symbol-name x))
+                                          (character (string x))
+                                          (string x)))))
+                       `(,binding (gensym ,(symbol-name binding)))))
+                 bindings)
+         ,@body))
+
+(defmacro with-rebinding (bindings &body body)
+  "Syntax: WITH-REBINDING ( { var | (var prefix) }* ) form*
+
+Evaluates a series of forms in the lexical environment that is
+formed by adding the binding of each VAR to a fresh, uninterned
+symbol, and the binding of that fresh, uninterned symbol to VAR's
+original value, i.e., its value in the current lexical environment.
+
+The uninterned symbol is created as if by a call to GENSYM with the
+string denoted by PREFIX - or, if PREFIX is not supplied, the string
+denoted by VAR - as argument.
+
+The forms are evaluated in order, and the values of all but the last
+are discarded \(that is, the body is an implicit PROGN)."
+  ;; reference implementation posted to comp.lang.lisp as
+  ;; <cy3wv0fya0p.fsf@ljosa.com> by Vebjorn Ljosa - see also
+  ;; <http://www.cliki.net/Common%20Lisp%20Utilities>
+  (loop for binding in bindings
+        for var = (if (consp binding) (car binding) binding)
+        for name = (gensym)
+        collect `(,name ,var) into renames
+        collect ``(,,var ,,name) into temps
+        finally (return `(let ,renames
+                          (with-unique-names ,bindings
+                            `(let (,,@temps)
+                              ,,@body))))))
+
 (defmacro authorized-page ((realm
                             user
                             password
                             &key
+                            (use-ssl t)
+                            ssl-port
                             (login-page-function #'login-page)) &rest body)
-  `(if (or (not (realm-use-ssl ,realm))
-           (ssl-p))
-       (if (or (and ,user ,password
-                    (check-password ,realm ,user ,password))
-               (session-realm-user-authenticated-p ,realm))
-           (progn
-             (unless (session-realm-user-authenticated-p ,realm)
-               (setf (session-realm-user ,realm) ,user)
-               (setf (session-realm-user-authenticated-p ,realm) t))
-             ,@body)
-           (funcall ,login-page-function))
-       (progn
-         (apply #'redirect (request-uri)
-                :protocol :https
-                (let ((ssl-port (realm-ssl-port ,realm)))
-                  (when ssl-port
+  (with-rebinding (realm user password ssl-port)
+    `(if (or (not ,use-ssl)
+             (ssl-p))
+         (if (or (and ,user ,password
+                      (check-password ,realm ,user ,password))
+                 (session-realm-user-authenticated-p ,realm))
+             (progn
+               (unless (session-realm-user-authenticated-p ,realm)
+                 (setf (session-realm-user ,realm) ,user)
+                 (setf (session-realm-user-authenticated-p ,realm) t))
+               ,@body)
+             (funcall ,login-page-function))
+         (progn
+           (apply #'redirect (request-uri)
+                  :protocol :https
+                  (when ,ssl-port
                     (multiple-value-bind (host-name)
                         (parse-host-name-and-port (host))
-                      `(:host ,host-name :port ,ssl-port))))))))
+                      `(:host ,host-name :port ,,ssl-port))))))))
 
