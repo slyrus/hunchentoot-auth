@@ -140,6 +140,20 @@ length."
 (defun get-realm-user (realm name)
   (gethash name (realm-users realm)))
 
+(defun hash-keys (hash)
+  (loop for k being the hash-keys of hash
+     collect k))
+
+(defun hash-values (hash)
+  (loop for k being the hash-values of hash
+     collect k))
+
+(defun get-realm-user-names (realm)
+  (hash-keys (realm-users realm)))
+
+(defun get-realm-users (realm)
+  (hash-values (realm-users realm)))
+
 (defmethod set-password ((realm realm) (name string) password)
   (let ((user (get-realm-user realm name)))
     (when user
@@ -169,6 +183,13 @@ length."
       (check-password realm user password))))
 
 ;;; groups
+
+(defun get-realm-group-names (realm)
+  (hash-keys (realm-groups realm)))
+
+(defun get-realm-groups (realm)
+  (hash-values (realm-groups realm)))
+
 (defmethod read-realm-groups ((realm realm))
   (let ((path (realm-group-storage-path realm)))
     (when (probe-file path)

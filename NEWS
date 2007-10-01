@@ -7,3 +7,7 @@
   in" in one hunchentoot session for one realm, but not logged in for
   another realm in the same server/session, or that a user could be
   logged into each realm with different user names.
+* realm authentication stuff now works properly so that one can have
+  multiple realms active on the same server. For instance, one may
+  have two nuclblog blogs, each with its own realm for user/password
+  information and the ht-auth stuff now works properly in this case.
