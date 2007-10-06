@@ -1,4 +1,4 @@
-;;; file: defpackage.lisp
+;;; file: hunchentoot-auth-test.asd
 ;;;
 ;;; Copyright (c) 2007 Cyrus Harmon (ch-lisp@bobobeach.com)
 ;;; All rights reserved.
@@ -30,27 +30,20 @@
 
 (in-package #:cl-user)
 
-(defpackage #:hunchentoot-auth
-  (:use #:cl #:cl-who #:hunchentoot #:hunchentoot-mp)
-  (:nicknames #:ht-auth)
-  (:export #:realm
-
-           #:read-realm-users
-           #:set-password
-           #:add-user
-           #:delete-user
-           #:check-password
-
-           #:get-realm-user
-           #:get-realm-user-names
-           #:get-realm-users
-           
-           #:read-realm-groups
-           #:add-group
-           
-           #:generate-html-login
-
-           #:authorized-page
-           #:session-realm-user
-           #:session-realm-user-authenticated-p))
-
+(asdf:defsystem hunchentoot-auth-test
+  :name "hunchentoot-auth-test"
+  :author "Cyrus Harmon <ch-lisp@bobobeach.com>"
+  :version #.(with-open-file
+                 (vers (merge-pathnames "version.lisp-expr"
+                                        *load-truename*))
+               (read vers))
+  :licence "BSD"
+  :depends-on (hunchentoot-auth ch-asdf)
+  :components
+  ((:module
+    "test"
+    :components
+    ((:cl-source-file "defpackage")
+     (:cl-source-file "hunchentoot-auth-test"
+      :depends-on ("defpackage"))
+     (:module "test-realm")))))
