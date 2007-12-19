@@ -64,6 +64,11 @@ which to store the group hash-table."))
   (:documentation "Objects of this class represent realms for which a
   given user/password scheme should apply."))
 
+(defmethod shared-initialize :after ((realm realm) slot-names &rest initargs)
+  (declare (ignore slot-names initargs))
+  (read-realm-users realm)
+  (read-realm-groups realm))
+
 ;;; users and passwords
 (defgeneric read-realm-users (realm)
   (:documentation "Read the users for this realm from the password

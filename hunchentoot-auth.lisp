@@ -161,24 +161,25 @@ are discarded \(that is, the body is an implicit PROGN)."
                             &key
                             (use-ssl t)
                             ssl-port
-                            (login-page-function #'login-page)) &rest body)
-  (with-rebinding (realm user password ssl-port)
-    `(if (or (not ,use-ssl)
-             (ssl-p))
-         (if (or (and ,user ,password
-                      (check-password ,realm ,user ,password))
-                 (session-realm-user-authenticated-p ,realm))
-             (progn
-               (unless (session-realm-user-authenticated-p ,realm)
-                 (setf (session-realm-user ,realm) ,user)
-                 (setf (session-realm-user-authenticated-p ,realm) t))
-               ,@body)
-             (funcall ,login-page-function))
-         (progn
-           (apply #'redirect (request-uri)
-                  :protocol :https
-                  (when ,ssl-port
-                    (multiple-value-bind (host-name)
-                        (parse-host-name-and-port (host))
-                      `(:host ,host-name :port ,,ssl-port))))))))
+                            (login-page-function 'login-page)) &rest body)
+  `(if (or (not ,use-ssl)
+           (ssl-p))
+       (if (or (and ,user ,password
+                    (check-password ,realm ,user ,password))
+               (session-realm-user-authenticated-p ,realm))
+           (progn
+             (unless (session-realm-user-authenticated-p ,realm)
+               (setf (session-realm-user ,realm) ,user)
+               (setf (session-realm-user-authenticated-p ,realm) t))
+             (let ((,user (session-realm-user ,realm)))
+               (declare (ignorable ,user))
+               ,@body))
+           (,login-page-function))
+       (progn
+         (apply #'redirect (request-uri)
+                :protocol :https
+                (when ,ssl-port
+                  (multiple-value-bind (host-name)
+                      (parse-host-name-and-port (host))
+                    `(:host ,host-name :port ,,ssl-port)))))))
 
