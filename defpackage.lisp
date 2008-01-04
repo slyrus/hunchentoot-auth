@@ -44,6 +44,8 @@
            #:get-realm-user
            #:get-realm-user-names
            #:get-realm-users
+
+           #:user-name
            
            #:read-realm-groups
            #:add-group

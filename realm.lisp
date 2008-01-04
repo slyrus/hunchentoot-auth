@@ -32,6 +32,7 @@
 
 (defclass user ()
   ((name :accessor user-name :initarg :name)
+   (full-name :accessor user-full-name :initarg :full-name :initform nil)
    (password :accessor user-password :initarg :password :initform "")
    (password-salt :accessor user-password-salt :initarg :password-salt)))
 
