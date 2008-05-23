@@ -44,5 +44,6 @@
    (:static-file "LICENSE")
    (:static-file "NEWS")
    (:cl-source-file "defpackage")
-   (:cl-source-file "hunchentoot-auth" :depends-on ("defpackage"))
-   (:cl-source-file "realm" :depends-on ("defpackage" "hunchentoot-auth"))))
+   (:cl-source-file "realm" :depends-on ("defpackage"))
+   (:cl-source-file "hunchentoot-auth" :depends-on ("defpackage" "realm"))
+   (:cl-source-file "server" :depends-on ("defpackage" "hunchentoot-auth" "realm"))))
