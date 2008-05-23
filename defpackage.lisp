@@ -31,7 +31,7 @@
 (in-package #:cl-user)
 
 (defpackage #:hunchentoot-auth
-  (:use #:cl #:cl-who #:hunchentoot #:hunchentoot-mp)
+  (:use #:cl #:cl-who #:hunchentoot)
   (:nicknames #:ht-auth)
   (:export #:realm
 
