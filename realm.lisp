@@ -107,24 +107,24 @@ which to store the group hash-table."))
   (:documentation "Adds a new group named group with the specified 
   realm."))
 
-(defparameter *password-file-lock* (make-lock "password-file-lock"))
-(defparameter *password-lock* (make-lock "password-lock"))
+(defparameter *password-file-lock* (bt:make-lock "password-file-lock"))
+(defparameter *password-lock* (bt:make-lock "password-lock"))
 
 (defmethod read-realm-users ((realm realm))
   (let ((path (realm-user-storage-path realm)))
     (when (probe-file path)
-      (with-lock (*password-file-lock*)
+      (bt:with-lock-held (*password-file-lock*)
         (setf (realm-users realm)
               (cl-store:restore path))))))
 
 (defmethod store-realm-users ((realm realm))
   (let ((path (realm-user-storage-path realm)))
     (ensure-directories-exist path)
-    (with-lock (*password-file-lock*)
+    (bt:with-lock-held (*password-file-lock*)
       (cl-store:store (realm-users realm) path))))
 
 (defmethod set-password ((realm realm) (user user) password)
-  (with-lock (*password-lock*)
+  (bt:with-lock-held (*password-lock*)
     (setf (user-password user)
           (md5:md5sum-sequence
            (concatenate 'simple-string (user-password-salt user) password)))
@@ -167,13 +167,13 @@ length."
 
 (defmethod add-user ((realm realm) (name string) (password string))
   (let ((user (make-instance 'user :name name :password-salt (random-string 8))))
-    (with-lock (*password-lock*)
+    (bt:with-lock-held (*password-lock*)
       (setf (gethash name (realm-users realm)) user)
       (set-password realm user password))
     user))
 
 (defmethod delete-user ((realm realm) (name string))
-  (with-lock (*password-lock*)
+  (bt:with-lock-held (*password-lock*)
     (remhash name (realm-users realm))
     (store-realm-users realm)))
 
@@ -199,14 +199,14 @@ length."
 (defmethod read-realm-groups ((realm realm))
   (let ((path (realm-group-storage-path realm)))
     (when (probe-file path)
-      (with-lock (*password-file-lock*)
+      (bt:with-lock-held (*password-file-lock*)
         (setf (realm-groups realm)
               (cl-store:restore path))))))
 
 (defmethod store-realm-groups ((realm realm))
   (let ((path (realm-group-storage-path realm)))
     (ensure-directories-exist path)
-    (with-lock (*password-file-lock*)
+    (bt:with-lock-held (*password-file-lock*)
       (cl-store:store (realm-groups realm) path))))
 
 (defmethod add-group ((realm realm) (name string))
