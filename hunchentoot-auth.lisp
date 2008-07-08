@@ -119,7 +119,7 @@ directing the output to *standard-output* and setting :prologue to t."
                ,@body))
            (,login-page-function))
        (progn
-         (apply #'redirect (request-uri)
+         (apply #'redirect (request-uri*)
                 :protocol :https
                 (when ,ssl-port
                   (multiple-value-bind (host-name)
