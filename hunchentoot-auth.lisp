@@ -99,52 +99,62 @@ directing the output to *standard-output* and setting :prologue to t."
     (setf (gethash realm hash) value)))
 
 (defmacro authorized-page ((realm
-                            user
-                            password
                             &key
                             (use-ssl t)
                             ssl-port
-                            (login-page-function 'login-page)) &rest body)
-  `(if (or (not ,use-ssl)
-           (ssl-p))
-       (if (or (and ,user ,password
-                    (check-password ,realm ,user ,password))
-               (session-realm-user-authenticated-p ,realm))
+                            (login-page-function 'login-page))
+                           &rest body)
+  (hunchentoot::with-unique-names (user password)
+    `(let ((,user (tbnl:parameter "user"))
+           (,password (tbnl:parameter "password")))
+       (if (or (not ,use-ssl)
+               (ssl-p))
+           (if (or (and ,user ,password
+                        (check-password ,realm ,user ,password))
+                   (session-realm-user-authenticated-p ,realm))
+               (progn
+                 (unless (session-realm-user-authenticated-p ,realm)
+                   (setf (session-realm-user ,realm) ,user)
+                   (setf (session-realm-user-authenticated-p ,realm) t))
+                 (progn
+                   ,@body))
+               (,login-page-function))
            (progn
-             (unless (session-realm-user-authenticated-p ,realm)
-               (setf (session-realm-user ,realm) ,user)
-               (setf (session-realm-user-authenticated-p ,realm) t))
-             (let ((,user (session-realm-user ,realm)))
-               (declare (ignorable ,user))
-               ,@body))
-           (,login-page-function))
-       (progn
-         (apply #'redirect (request-uri*)
-                :protocol :https
-                (when ,ssl-port
-                  (multiple-value-bind (host-name)
-                      (parse-host-name-and-port (host))
-                    `(:host ,host-name :port ,,ssl-port)))))))
+             (apply #'redirect (request-uri*)
+                    :protocol :https
+                    (when ,ssl-port
+                      (multiple-value-bind (host-name)
+                          (parse-host-name-and-port (host))
+                        `(:host ,host-name :port ,,ssl-port)))))))))
 
+(defun create-authorized-dispatcher (uri-base
+                                     realm
+                                     dispatcher
+                                     &key
+                                     (use-ssl t)
+                                     ssl-port
+                                     (login-page-function 'login-page))
+  
+  (lambda (request)
+    (when (tbnl::starts-with-p (tbnl:script-name request) uri-base)
+      (let ((user (tbnl:parameter "user"))
+            (password (tbnl:parameter "password")))
+        (if (or (not use-ssl)
+                (tbnl:ssl-p))
+            (if (or (and user password
+                         (check-password realm user password))
+                    (session-realm-user-authenticated-p realm))
+                (progn
+                  (unless (session-realm-user-authenticated-p realm)
+                    (setf (session-realm-user realm) user)
+                    (setf (session-realm-user-authenticated-p realm) t))
+                  (funcall dispatcher request))
+                login-page-function)
+            (lambda ()
+              (apply #'redirect (request-uri*)
+                     :protocol :https
+                     (when ssl-port
+                       (multiple-value-bind (host-name)
+                           (parse-host-name-and-port (host))
+                         `(:host ,host-name :port ,ssl-port))))))))))
 
-#+nil
-(defun create-handler-authorization-handler (realm handler)
-  (unless realm 
-          (error "~S must be a realm." realm))
-  (unless handler 
-          (error "~S must be a handler." handler))
-  (flet ((handler ()
-           (let* ((script-name (url-decode (script-name)))
-                  (script-path (enough-url (regex-replace-all "\\\\" script-name "/")
-                                           uri-prefix))
-                  (script-path-directory (pathname-directory script-path)))
-             (unless (or (stringp script-path-directory)
-                         (null script-path-directory)
-                         (and (listp script-path-directory)
-                              (eq (first script-path-directory) :relative)
-                              (loop for component in (rest script-path-directory)
-                                    always (stringp component))))
-               (setf (return-code) +http-forbidden+)
-               (throw 'handler-done nil))
-             (handle-static-file (merge-pathnames script-path base-path) content-type))))
-    (create-prefix-dispatcher uri-prefix #'handler)))
