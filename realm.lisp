@@ -83,7 +83,7 @@ which to store the group hash-table."))
   (:documentation "Sets the password for the specified user in this
   realm."))
 
-(defgeneric add-user (realm user password)
+(defgeneric add-user (realm user password &key)
   (:documentation "Adds a new user with the specified password in this
   realm."))
 
@@ -165,10 +165,13 @@ length."
     (when user
       (set-password realm user password))))
 
-(defmethod add-user ((realm realm) (name string) (password string))
+(defmethod add-user ((realm realm) (name string) (password string)
+                     &key full-name)
   (let ((user (make-instance 'user :name name :password-salt (random-string 8))))
     (bt:with-recursive-lock-held (*password-lock*)
       (setf (gethash name (realm-users realm)) user)
+      (when full-name
+        (setf (user-full-name user) full-name))
       (set-password realm user password))
     user))
 
