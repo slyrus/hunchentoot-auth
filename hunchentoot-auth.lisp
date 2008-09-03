@@ -153,7 +153,8 @@ directing the output to *standard-output* and setting :prologue to t."
             (lambda ()
               (apply #'redirect (request-uri*)
                      :protocol :https
-                     (when ssl-port
+                     (when (and ssl-port
+                                (/= ssl-port 443)) 
                        (multiple-value-bind (host-name)
                            (parse-host-name-and-port (host))
                          `(:host ,host-name :port ,ssl-port))))))))))
