@@ -33,16 +33,10 @@
 (asdf:defsystem hunchentoot-auth
   :name "hunchentoot-auth"
   :author "Cyrus Harmon <ch-lisp@bobobeach.com>"
-  :version #.(with-open-file
-                 (vers (merge-pathnames "version.lisp-expr" *load-truename*))
-               (read vers))
+  :version "0.2.1"
   :licence "BSD"
   :depends-on (hunchentoot cl-who cl-store bordeaux-threads)
   :components
-  ((:static-file "version" :pathname #p"version.lisp-expr")
-   (:static-file "README")
-   (:static-file "LICENSE")
-   (:static-file "NEWS")
-   (:cl-source-file "defpackage")
+  ((:cl-source-file "defpackage")
    (:cl-source-file "realm" :depends-on ("defpackage"))
    (:cl-source-file "hunchentoot-auth" :depends-on ("defpackage" "realm"))))
